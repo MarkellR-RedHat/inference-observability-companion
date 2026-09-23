@@ -1,0 +1,23 @@
+# FRAGMENT, not a full resource: merge the `args` and `env` into your existing InferenceService (KServe, vLLM runtime).
+# VERIFIED from source: spec.predictor.model inlines a Container, InferenceService args are appended to the ServingRuntime's args,
+#   env is merged (kserve predictor.go, MergeRuntimeContainers). The flag is what enables tracing; env vars alone never do.
+# Assembled from verified pieces. No Red Hat doc shows OTLP args on an InferenceService. NOT applied to a cluster.
+# Dashboard equivalent: Deployments > Edit > "Additional serving runtime arguments" and "Additional environment variables".
+# Do not touch --port, --model or --served-model-name.
+#
+#   oc patch inferenceservice <NAME> -n <NS> --type=json -p '[
+#     {"op":"add","path":"/spec/predictor/model/args","value":["--otlp-traces-endpoint=http://demo-collector.<NS>.svc.cluster.local:4317"]},
+#     {"op":"add","path":"/spec/predictor/model/env","value":[{"name":"OTEL_SERVICE_NAME","value":"vllm-server"}]}]'
+#   (if args or env already exist, use path ".../args/-" and a single string value so nothing is overwritten)
+spec:
+  predictor:
+    model:
+      args:
+        - "--otlp-traces-endpoint=http://demo-collector.<NS>.svc.cluster.local:4317"
+      env:
+        - name: OTEL_SERVICE_NAME
+          value: "vllm-server"
+# After the pod restarts, check:
+#   oc logs <vllm-pod> | grep -i -E "otlp|tracing|opentelemetry"
+#   oc exec <vllm-pod> -- python -c "import opentelemetry.exporter.otlp.proto.grpc.trace_exporter; print('otel ok')"
+#   oc exec <vllm-pod> -- python -c "import vllm; print(vllm.__version__)"      # decides which metric names and example paths apply

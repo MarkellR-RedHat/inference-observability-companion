@@ -1,0 +1,77 @@
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: vllm-cpu-tracing
+  namespace: <your-namespace>
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/template-display-name: vLLM CPU with Tracing
+spec:
+  annotations:
+    opendatahub.io/kserve-runtime: vllm
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8080"
+  containers:
+  - name: kserve-container
+    image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:5d20d59ed8af657eb23e54a6a2c5b2520791d8544c14e8e83061fae74f36e3e3
+    command:
+    - python
+    - -m
+    - vllm.entrypoints.openai.api_server
+    args:
+    - --port=8080
+    - --model=/mnt/models
+    - --served-model-name={{.Name}}
+    - --otlp-traces-endpoint=http://jaeger.<your-namespace>.svc.cluster.local:4317
+    env:
+    - name: HF_HOME
+      value: /tmp/hf_home
+    - name: OTEL_SERVICE_NAME
+      value: vllm-server
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+  multiModel: false
+  supportedModelFormats:
+  - autoSelect: true
+    name: vLLM
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: obs-demo-model
+  namespace: <your-namespace>
+  annotations:
+    opendatahub.io/hardware-profile-name: <your-hardware-profile>
+    opendatahub.io/hardware-profile-namespace: <your-hardware-profile-namespace>
+    serving.kserve.io/deploymentMode: Standard
+    security.opendatahub.io/enable-auth: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+    networking.kserve.io/visibility: exposed
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: vllm-cpu-tracing
+      storageUri: oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w4a16:1.5
+      args:
+      - --max-model-len=4096
+      - --max-num-batched-tokens=512
+      - --max-num-seqs=2
+      env:
+      - name: VLLM_CPU_KVCACHE_SPACE
+        value: "16"
+      resources:
+        requests:
+          cpu: "8"
+          memory: 64Gi
+        limits:
+          cpu: "16"
+          memory: 128Gi
+    timeout: 600
