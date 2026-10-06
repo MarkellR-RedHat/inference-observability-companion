@@ -1,0 +1,6 @@
+# load generator output and fetched traces from local runs
+/loadgen-*.csv
+/traces/
+__pycache__/
+*.pyc
+.DS_Store

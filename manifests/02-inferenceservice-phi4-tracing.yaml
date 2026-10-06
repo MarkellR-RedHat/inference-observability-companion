@@ -1,0 +1,52 @@
+# The Blog 1 model: Phi-4 quantized to W4A16, served by vLLM on one GPU, with OpenTelemetry tracing on.
+#
+# Set three values before applying:
+#   RUNTIME     the vLLM GPU ServingRuntime in your project       oc get servingruntime -n <project>
+#   HW_PROFILE  a hardware profile that grants one GPU            oc get hardwareprofiles -A
+#   HW_NS       the namespace that hardware profile lives in      (the NAMESPACE column of the command above)
+#
+#   oc apply -n <project> -f 02-inferenceservice-phi4-tracing.yaml
+#
+# KServe appends the args below to the ServingRuntime's own (--port, --model, --served-model-name) and merges the env.
+# --max-num-seqs=2 caps vLLM at two requests in flight, so one GPU queues under eight concurrent clients. That is
+# deliberate: the post is about reading queue time. Remove it to see the same model with no artificial ceiling.
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: obs-demo-model
+  annotations:
+    opendatahub.io/hardware-profile-name: HW_PROFILE
+    opendatahub.io/hardware-profile-namespace: HW_NS
+    serving.kserve.io/deploymentMode: Standard
+    security.opendatahub.io/enable-auth: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+    networking.kserve.io/visibility: exposed
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: RUNTIME
+      storageUri: oci://registry.redhat.io/rhelai1/modelcar-phi-4-quantized-w4a16:1.5
+      args:
+      - --max-model-len=4096
+      - --max-num-seqs=2
+      - --gpu-memory-utilization=0.9
+      - --otlp-traces-endpoint=http://jaeger:4317
+      env:
+      - name: OTEL_SERVICE_NAME
+        value: vllm-server
+      resources:
+        requests:
+          cpu: "2"
+          memory: 16Gi
+          nvidia.com/gpu: "1"
+        limits:
+          cpu: "4"
+          memory: 32Gi
+          nvidia.com/gpu: "1"
+    timeout: 600

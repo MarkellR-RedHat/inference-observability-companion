@@ -1,9 +1,16 @@
+# The same setup without a GPU: a ServingRuntime on the Red Hat vLLM CPU image, plus an InferenceService that uses it.
+# Slow, and enough to see queueing and a real llm_request span on a cluster with no accelerator.
+#
+#   oc apply -n <project> -f 04-vllm-cpu-servingruntime-with-tracing.yaml
+#
+# Set HW_PROFILE and HW_NS to a CPU hardware profile (oc get hardwareprofiles -A). The tracing argument lives on the
+# ServingRuntime here, so every model deployed with this runtime traces. Jaeger (01-jaeger-all-in-one.yaml) must be
+# in the same project, or change the endpoint to http://jaeger.<project>.svc.cluster.local:4317.
 ---
 apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:
   name: vllm-cpu-tracing
-  namespace: <your-namespace>
   labels:
     opendatahub.io/dashboard: "true"
   annotations:
@@ -24,7 +31,7 @@ spec:
     - --port=8080
     - --model=/mnt/models
     - --served-model-name={{.Name}}
-    - --otlp-traces-endpoint=http://jaeger.<your-namespace>.svc.cluster.local:4317
+    - --otlp-traces-endpoint=http://jaeger:4317
     env:
     - name: HF_HOME
       value: /tmp/hf_home
@@ -42,10 +49,9 @@ apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
   name: obs-demo-model
-  namespace: <your-namespace>
   annotations:
-    opendatahub.io/hardware-profile-name: <your-hardware-profile>
-    opendatahub.io/hardware-profile-namespace: <your-hardware-profile-namespace>
+    opendatahub.io/hardware-profile-name: HW_PROFILE
+    opendatahub.io/hardware-profile-namespace: HW_NS
     serving.kserve.io/deploymentMode: Standard
     security.opendatahub.io/enable-auth: "false"
   labels:

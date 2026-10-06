@@ -5,8 +5,8 @@ Standard library only, so it runs on any laptop or in a UBI Python pod without i
 
 What it is for: the opening scene of the observability series. Send a lot of ordinary
 requests, plus a few heavy ones, find the slow request in the CSV, and look up its
-trace ID in Tempo. Every request carries its own W3C `traceparent` header, so if the
-server joins incoming trace context the trace ID in the CSV is the trace ID in Tempo.
+trace ID in Jaeger. Every request carries its own W3C `traceparent` header, so if the
+server joins incoming trace context the trace ID in the CSV is the trace ID in Jaeger.
 
 Examples:
   # 200 requests, 8 at a time, 3 heavy ones mixed in
@@ -219,7 +219,7 @@ def main() -> int:
     if ttfts:
         print(f"time to first token  p50={percentile(ttfts, .5):.2f}s  p95={percentile(ttfts, .95):.2f}s  max={max(ttfts):.2f}s")
     print()
-    print("slowest five (look these trace IDs up in Tempo):")
+    print("slowest five (look these trace IDs up in Jaeger):")
     print(f"  {'idx':>5}  {'kind':8}  {'total_s':>8}  {'ttft_s':>7}  {'out_tok':>7}  trace_id")
     for r in sorted(ok, key=lambda r: -float(r["total_s"]))[:5]:
         print(f"  {r['idx']:>5}  {r['kind']:8}  {r['total_s']:>8}  {str(r['ttft_s']):>7}  {str(r['completion_tokens']):>7}  {r['trace_id']}")

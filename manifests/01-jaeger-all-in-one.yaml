@@ -1,9 +1,18 @@
+# Jaeger all-in-one: OTLP collector, in-memory storage and the UI in one pod.
+# For demos. Traces live in the pod's memory and are gone when it restarts.
+#
+#   oc apply -n <project> -f 01-jaeger-all-in-one.yaml
+#
+# Workloads in the same project export to   http://jaeger:4317   (gRPC) or   http://jaeger:4318   (HTTP).
+# From another project use   http://jaeger.<project>.svc.cluster.local:4317
+# The UI is on the Route:   oc get route jaeger-ui -o jsonpath='{.spec.host}'
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: jaeger
-  namespace: <your-namespace>
+  labels:
+    app: jaeger
 spec:
   replicas: 1
   selector:
@@ -39,27 +48,29 @@ apiVersion: v1
 kind: Service
 metadata:
   name: jaeger
-  namespace: <your-namespace>
+  labels:
+    app: jaeger
 spec:
   selector:
     app: jaeger
   ports:
   - name: ui
     port: 16686
-    targetPort: 16686
+    targetPort: ui
   - name: otlp-grpc
     port: 4317
-    targetPort: 4317
-    appProtocol: grpc
+    targetPort: otlp-grpc
+    appProtocol: grpc      # keeps a service mesh from treating the gRPC stream as plain HTTP
   - name: otlp-http
     port: 4318
-    targetPort: 4318
+    targetPort: otlp-http
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: jaeger-ui
-  namespace: <your-namespace>
+  labels:
+    app: jaeger
 spec:
   to:
     kind: Service
@@ -68,3 +79,4 @@ spec:
     targetPort: ui
   tls:
     termination: edge
+    insecureEdgeTerminationPolicy: Redirect
